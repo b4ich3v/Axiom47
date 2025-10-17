@@ -6,11 +6,6 @@ Axiom47
 ## Project author
 Yoan Desislavov Baychev
 
-## № Names of Participants FN
-1. Name 1 (FN: XXXXX)  
-2. Name 2 (FN: XXXXX)  
-3. Name 3 (FN: XXXXX)
-
 ---
 
 ## 1. Short project description (Business needs and system features)
