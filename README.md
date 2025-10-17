@@ -1,4 +1,4 @@
-# Edge Orchestrator for Retail/Kiosk Fleets (Go)
+# XDP47 - Edge Orchestrator for Retail/Kiosk Fleets (Go)
 
 ## 1) Summary (Business Need & Capabilities)
 Retail/HoReCa chains operate hundreds of edge devices (kiosks, POS, info-panels) across locations. Manual updates and reliability issues cause lost sales and high ops costs.  
