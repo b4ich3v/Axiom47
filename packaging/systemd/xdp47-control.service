@@ -1,0 +1,15 @@
+[Unit]
+Description=XDP47 Control Plane
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=HOME=/var/lib/xdp47
+EnvironmentFile=-/etc/default/xdp47-control
+ExecStart=/usr/local/bin/xdp47-control
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
