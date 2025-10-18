@@ -1,0 +1,73 @@
+// --- UI (Devices is unchanged; Rollouts gains a Start button) ---
+
+func uiRollouts(w http.ResponseWriter, r *http.Request) {
+    html := `<!doctype html><html><head><meta charset="utf-8"><title>XDP47 Rollouts</title>
+<style>
+  body{font-family:system-ui;margin:24px;background:#0b0e14;color:#e6e6e6}
+  table{border-collapse:collapse;width:100%;margin-top:12px}
+  th,td{border-bottom:1px solid #2a2f3a;padding:8px;text-align:left}
+  .muted{color:#9aa0a6}.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#2a2f3a}
+  button{background:#1f6feb;color:#fff;border:0;border-radius:8px;padding:6px 10px;cursor:pointer}
+  button[disabled]{opacity:.6;cursor:not-allowed}
+  .row-actions{display:flex;gap:8px}
+  .toast{position:fixed;right:16px;bottom:16px;background:#1f2937;color:#e5e7eb;padding:10px 14px;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,.3);opacity:0;transform:translateY(10px);transition:.2s}
+  .toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head><body><h1>Rollouts</h1>
+<div class="muted">Create (POST /api/rollouts) → Start (button) → observe status.</div>
+<table><thead><tr><th>ID</th><th>Tenant</th><th>Artifact</th><th>Channel</th><th>Waves</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+<tbody id="tbody"></tbody></table>
+<div id="toast" class="toast"></div>
+<script>
+const $tbody = document.getElementById('tbody');
+const $toast = document.getElementById('toast');
+function toast(msg){
+  $toast.textContent = msg;
+  $toast.classList.add('show');
+  setTimeout(()=> $toast.classList.remove('show'), 2000);
+}
+async function start(id, btn){
+  try{
+    btn.disabled = true;
+    // Support both :start and /start; server registers both
+    let res = await fetch('/api/rollouts/'+id+'/start', {method:'POST'});
+    if(!res.ok){
+      // try :start
+      res = await fetch('/api/rollouts/'+id+':start', {method:'POST'});
+    }
+    if(!res.ok){
+      const t = await res.text();
+      throw new Error(t||('HTTP '+res.status));
+    }
+    toast('Rollout '+id+' started');
+    load();
+  }catch(e){
+    toast('Error: '+e.message);
+  }finally{
+    btn.disabled = false;
+  }
+}
+function pill(s){return '<span class="pill">'+(s||'draft')+'</span>'}
+function row(x){
+  const id = x.id;
+  return '<tr>'+
+    '<td>'+id+'</td>'+
+    '<td>'+x.tenant+'</td>'+
+    '<td>'+(x.artifact||'')+'</td>'+
+    '<td>'+(x.channel||'')+'</td>'+
+    '<td>'+x.waves+'</td>'+
+    '<td>'+pill(x.status)+'</td>'+
+    '<td>'+new Date(x.created_at).toLocaleString()+'</td>'+
+    '<td class="row-actions">'+
+      '<button onclick="start(\''+id+'\', this)">Start</button>'+
+    '</td>'+
+  '</tr>';
+}
+async function load(){
+  const r = await fetch('/api/rollouts'); const arr = await r.json();
+  $tbody.innerHTML = arr.map(row).join('');
+} load(); setInterval(load, 5000);
+</script></body></html>`
+    w.Header().Set("Content-Type", "text/html; charset=utf-8")
+    _, _ = w.Write([]byte(html))
+}

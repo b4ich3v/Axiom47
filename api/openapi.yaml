@@ -1,0 +1,93 @@
+openapi: 3.0.3
+info:
+  title: XDP47 API (MVP-1)
+  version: 0.0.2
+paths:
+  /healthz:
+    get:
+      summary: Liveness check
+      responses:
+        '200':
+          description: OK
+  /api/devices:
+    get:
+      summary: List devices (in-memory)
+      responses:
+        '200':
+          description: Devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    tenant: { type: string }
+                    labels: { type: object, additionalProperties: true }
+                    last_seen: { type: string, format: date-time }
+                    health: { type: string }
+  /api/devices/claim:
+    post:
+      summary: Claim (register) a device with a short-lived token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tenant:
+                  type: string
+                labels:
+                  type: object
+                  additionalProperties: true
+              required: [tenant]
+      responses:
+        '200':
+          description: Claimed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_id:
+                    type: string
+  /api/devices/{id}/heartbeat:
+    post:
+      summary: Device heartbeat (updates last_seen & health)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ts: { type: string, format: date-time }
+                cpu: { type: number }
+                mem: { type: number }
+                status: { type: string }
+                tags:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: OK
+  /api/devices/{id}/metrics/stream:
+    get:
+      summary: SSE stream with demo metrics for the device
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: text/event-stream
