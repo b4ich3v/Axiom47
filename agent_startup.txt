@@ -1,0 +1,14 @@
+cd D:\XDP47
+
+$env:XDP47_CONTROL_URL = "http://127.0.0.1:8080"
+$env:XDP47_TENANT      = "demo-tenant"
+$env:XDP47_DEVICE_LABELS = "store=sofia-01,role=kiosk"
+
+# (по желание – полезно за rollouts/филтри)
+$env:XDP47_DEVICE_LOCATION = "sofia-01"
+$env:XDP47_DEVICE_VERSION  = "app:v1.2.3"
+$env:XDP47_DEVICE_CHANNEL  = "canary"
+
+.\bin\xdp47-agent.exe
+
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8080/api/devices" | ConvertTo-Json -Depth 6
