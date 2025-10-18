@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  agent:
+    image: xdp47/agent:latest
+    # or build: { context: .., dockerfile: docker/agent/Dockerfile }
+    environment:
+      XDP47_CONTROL_URL: "${XDP47_CONTROL_URL:?set-control-url}"
+      XDP47_TENANT: "${XDP47_TENANT:-demo-tenant}"
+      XDP47_DEVICE_LABELS: "${XDP47_DEVICE_LABELS:-store=unknown,role=kiosk}"
+    restart: unless-stopped

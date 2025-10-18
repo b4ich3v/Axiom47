@@ -1,0 +1,59 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-xdp47}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  control:
+    build:
+      context: ..
+      dockerfile: docker/control/Dockerfile
+    environment:
+      XDP47_DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-xdp47}?sslmode=disable
+      XDP47_LISTEN_ADDR: ":8080"
+      XDP47_SCHED_INTERVAL: ${XDP47_SCHED_INTERVAL:-5s}
+      XDP47_SCHED_GRACE: ${XDP47_SCHED_GRACE:-3m}
+      XDP47_SCHED_REQUIRE_OK: ${XDP47_SCHED_REQUIRE_OK:-false}
+      XDP47_SCHED_SKIP_OFFLINE: ${XDP47_SCHED_SKIP_OFFLINE:-true}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  agent1:
+    build:
+      context: ..
+      dockerfile: docker/agent/Dockerfile
+    environment:
+      XDP47_CONTROL_URL: "http://control:8080"
+      XDP47_TENANT: "demo-tenant"
+      XDP47_DEVICE_LABELS: "store=sofia-01,role=kiosk,track=canary-only"
+    depends_on:
+      - control
+
+  agent2:
+    build:
+      context: ..
+      dockerfile: docker/agent/Dockerfile
+    environment:
+      XDP47_CONTROL_URL: "http://control:8080"
+      XDP47_TENANT: "demo-tenant"
+      XDP47_DEVICE_LABELS: "store=sofia-02,role=kiosk"
+    depends_on:
+      - control
+
+volumes:
+  pgdata:

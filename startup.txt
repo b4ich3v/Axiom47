@@ -1,136 +1,163 @@
-XDP47 – Windows PowerShell Cheatsheet
-=====================================
-All commands assume your project lives in:  D:\XDP47
-Postgres (psql.exe) is at:                  D:\PostgreSQL\bin\psql.exe
-API/UI root:                                http://127.0.0.1:8080
+## One-time build (images)
 
-TIP: Open a **new** PowerShell window for each long-running process (control/agent).
+```powershell
+docker compose -f docker/docker-compose.dev.yml build --no-cache
+```
 
+> Bash/Zsh is the same; just replace backslashes if you copy paths.
 
-0) Stop everything (safe to run anytime)
-----------------------------------------
-taskkill /IM xdp47-agent.exe /F
-taskkill /IM xdp47-control.exe /F
+## Start (detached)
 
+Start everything (control + two demo agents):
 
-1) (Optional) Reset database tables (start clean)
--------------------------------------------------
-# Deletes all rows from devices, rollouts, rollout_runs
-& "D:\PostgreSQL\bin\psql.exe" -U postgres -d xdp47 -c "DELETE FROM rollout_runs; DELETE FROM rollouts; DELETE FROM devices;"
+```powershell
+docker compose -f docker/docker-compose.dev.yml up -d
+```
 
-# Example: add 'track=canary-only' to a device after it's created
-# & "D:\PostgreSQL\bin\psql.exe" -U postgres -d xdp47 -c "UPDATE devices SET labels = jsonb_set(labels,'{track}','\"canary-only\"',true) WHERE id='<DEVICE_ID>'"
+Start only the control plane:
 
+```powershell
+docker compose -f docker/docker-compose.dev.yml up -d control
+```
 
-2) Build (from project root)
-----------------------------
-cd D:\XDP47
-mingw32-make build
+### Rebuild & start after code changes
 
+- Rebuild **control** and restart it:
+  ```powershell
+  docker compose -f docker/docker-compose.dev.yml up -d --build control
+  ```
+- Rebuild **all** services and restart:
+  ```powershell
+  docker compose -f docker/docker-compose.dev.yml up -d --build
+  ```
 
-3) Start CONTROL plane (one window, keep it open)
--------------------------------------------------
-cd D:\XDP47
-$env:XDP47_DB_URL="postgres://postgres:drishlyoto1@localhost:5432/xdp47?sslmode=disable"
-$env:XDP47_LISTEN_ADDR=":8080"
+## Stop / Down
 
-# Scheduler tuning for local tests (safer defaults)
-$env:XDP47_SCHED_INTERVAL="5s"
-$env:XDP47_SCHED_GRACE="3m"
-$env:XDP47_SCHED_REQUIRE_OK="false"
-$env:XDP47_SCHED_SKIP_OFFLINE="true"
+- Stop (containers stay created):
+  ```powershell
+  docker compose -f docker/docker-compose.dev.yml stop
+  ```
+- Down (remove containers & network; images remain):
+  ```powershell
+  docker compose -f docker/docker-compose.dev.yml down
+  ```
 
-.\bin\xdp47-control.exe
-# UI: http://127.0.0.1:8080/ui/devices  and  http://127.0.0.1:8080/ui/rollouts
+## Logs & Status
 
+```powershell
+# status
+docker compose -f docker/docker-compose.dev.yml ps
 
-4) Start a single AGENT (new PowerShell window)
------------------------------------------------
-cd D:\XDP47
-$env:XDP47_CONTROL_URL="http://127.0.0.1:8080"
-$env:XDP47_TENANT="demo-tenant"
-$env:XDP47_DEVICE_LABELS="store=sofia-01,role=kiosk,track=canary-only"
-$env:XDP47_CHANNEL="canary"
-$env:XDP47_VERSION="app:v1.2.3"
-.\bin\xdp47-agent.exe
+# follow control logs
+docker compose -f docker/docker-compose.dev.yml logs -f control
 
+# follow agents
+docker compose -f docker/docker-compose.dev.yml logs -f agent1
+docker compose -f docker/docker-compose.dev.yml logs -f agent2
+```
 
-5) Start N agents quickly (each in its own window) – EXAMPLES
--------------------------------------------------------------
-# 5.1) Second agent (manual)
-Start-Process -NoNewWindow -PassThru powershell -ArgumentList @(
-  '-NoExit','-Command',
-  'cd D:\XDP47; $env:XDP47_CONTROL_URL="http://127.0.0.1:8080"; $env:XDP47_TENANT="demo-tenant"; $env:XDP47_DEVICE_LABELS="store=sofia-01,role=kiosk,track=canary-only"; $env:XDP47_CHANNEL="canary"; $env:XDP47_VERSION="app:v1.2.3"; .\bin\xdp47-agent.exe'
-)
+## UI & API
 
-# 5.2) Launch 3 agents in separate consoles (labels differ a bit)
-1..3 | ForEach-Object {
-  $track = "canary-only"
-  $labels = "store=sofia-01,role=kiosk,track=$track"
-  Start-Process powershell -ArgumentList @(
-    '-NoExit','-Command',
-    "cd D:\XDP47; \$env:XDP47_CONTROL_URL='http://127.0.0.1:8080'; \$env:XDP47_TENANT='demo-tenant'; \$env:XDP47_DEVICE_LABELS='$labels'; \$env:XDP47_CHANNEL='canary'; \$env:XDP47_VERSION='app:v1.2.3'; .\bin\xdp47-agent.exe"
-  )
-}
+- Devices: <http://127.0.0.1:8080/ui/devices>  
+- Rollouts: <http://127.0.0.1:8080/ui/rollouts>  
+- Health: <http://127.0.0.1:8080/healthz>  
 
+### Useful API calls
 
-6) Quick API checks
--------------------
-# Health
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8080/healthz"
+Create a rollout:
 
-# Devices (pretty print)
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8080/api/devices" | ConvertTo-Json -Depth 6
+```powershell
+curl -s -X POST "http://127.0.0.1:8080/api/rollouts" `
+  -H "Content-Type: application/json" `
+  -d '{"tenant":"demo-tenant","artifact":"app:v2.1.2","channel":"canary","selector":{"role":"kiosk"},"waves":2}'
+```
 
-# Rollouts list
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8080/api/rollouts" | ConvertTo-Json -Depth 6
+Start a rollout (two endpoints are supported; either works):
 
+```powershell
+curl -s -X POST "http://127.0.0.1:8080/api/rollouts/<ROLL_ID>:start"
+# or
+curl -s -X POST "http://127.0.0.1:8080/api/rollouts/<ROLL_ID>/start"
+```
 
-7) Create a rollout (canary -> track=canary-only) and Start it
---------------------------------------------------------------
-# Create
-$body = @'
-{"tenant":"demo-tenant","artifact":"app:v2.1.2","channel":"canary","selector":{"track":"canary-only"},"waves":2}
-'@
-$r = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/api/rollouts" -ContentType "application/json" -Body $body
-$r
+List rollouts:
 
-# Start (try both URL forms; one will work)
-try {
-  Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/api/rollouts/$($r.id)/start"
-} catch {
-  Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/api/rollouts/$($r.id):start"
-}
+```powershell
+curl -s "http://127.0.0.1:8080/api/rollouts"
+```
 
-# Details (runs per wave)
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8080/api/rollouts/$($r.id)/runs" | ConvertTo-Json -Depth 6
+Rollout runs (per-wave history):
 
+```powershell
+curl -s "http://127.0.0.1:8080/api/rollouts/<ROLL_ID>/runs"
+```
 
-8) Useful one‑liners
---------------------
-# Add 'track=canary-only' to ALL existing devices
-& "D:\PostgreSQL\bin\psql.exe" -U postgres -d xdp47 -c "UPDATE devices SET labels = jsonb_set(labels,'{track}','\"canary-only\"',true) WHERE (labels->>'track') IS NULL;"
+Simulate bucket split across waves (read-only plan):
 
-# Show rollout runs (latest 10; run inside psql)
-#   SELECT rollout_id, wave_index, status, started_at, finished_at
-#   FROM rollout_runs ORDER BY started_at DESC LIMIT 10;
+```powershell
+curl -s -X POST "http://127.0.0.1:8080/api/rollouts/<ROLL_ID>:simulate?waves=3"
+```
 
-# Rebuild & restart control quickly
-taskkill /IM xdp47-control.exe /F
-cd D:\XDP47; mingw32-make build; `
-$env:XDP47_DB_URL="postgres://postgres:drishlyoto1@localhost:5432/xdp47?sslmode=disable"; `
-$env:XDP47_LISTEN_ADDR=":8080"; `
-$env:XDP47_SCHED_INTERVAL="5s"; $env:XDP47_SCHED_GRACE="3m"; $env:XDP47_SCHED_REQUIRE_OK="false"; $env:XDP47_SCHED_SKIP_OFFLINE="true"; `
-.\bin\xdp47-control.exe
+List devices:
 
+```powershell
+curl -s "http://127.0.0.1:8080/api/devices"
+```
 
-9) Troubleshooting notes
-------------------------
-• If rollout status becomes 'failed':
-  - Ensure at least one device matches the selector (e.g. track=canary-only), is 'ok' and has a fresh 'Last seen'.
-  - Keep XDP47_SCHED_REQUIRE_OK=false and XDP47_SCHED_SKIP_OFFLINE=true during local tests.
-  - Watch the control window logs for clear reason (e.g. no candidates / offline).
+## Scheduler knobs (optional)
 
-• If PowerShell says “Unexpected token …” for psql line, always invoke psql via:  & "D:\PostgreSQL\bin\psql.exe"  (note the & and quotes).
+You can tune rollout pacing via env vars in `docker/docker-compose.dev.yml` (service `control`):
 
-• If UI shows old data, hard refresh the page (Ctrl+F5).
+```yaml
+environment:
+  - XDP47_SCHED_INTERVAL=10s      # delay between waves
+  - XDP47_SCHED_GRACE=90s         # heartbeat grace window
+  - XDP47_SCHED_REQUIRE_OK=false  # require 'ok' health to advance
+  - XDP47_SCHED_SKIP_OFFLINE=true # skip devices without recent heartbeat
+```
+
+Apply changes:
+
+```powershell
+docker compose -f docker/docker-compose.dev.yml up -d --build control
+```
+
+## Typical workflows
+
+### Restart only control after UI/API change
+```powershell
+docker compose -f docker/docker-compose.dev.yml up -d --build control
+docker compose -f docker/docker-compose.dev.yml logs -f control
+```
+
+### Full clean rebuild
+```powershell
+docker compose -f docker/docker-compose.dev.yml down
+docker compose -f docker/docker-compose.dev.yml build --no-cache
+docker compose -f docker/docker-compose.dev.yml up -d
+```
+
+## Troubleshooting
+
+- **Port 8080 busy**  
+  Stop whatever uses 8080 or adjust `ports:` in the compose file.
+
+- **UI shows garbled dashes like `XDP47 — Devices`**  
+  Ensure source files are saved in **UTF-8**. Then rebuild control:
+  ```powershell
+  docker compose -f docker/docker-compose.dev.yml up -d --build control
+  ```
+
+- **Rollout shows `failed`**  
+  Increase `XDP47_SCHED_GRACE` or set `XDP47_SCHED_REQUIRE_OK=false`.  
+  Check per-wave history:
+  ```powershell
+  curl -s "http://127.0.0.1:8080/api/rollouts/<ROLL_ID>/runs"
+  ```
+
+---
+
+### Notes
+
+- The demo agents auto-register as devices and periodically heartbeat.  
+- The control plane persists data inside its container filesystem in this dev setup (no external DB). For a clean slate, run `down` and `up -d` again; for production, wire an external Postgres.

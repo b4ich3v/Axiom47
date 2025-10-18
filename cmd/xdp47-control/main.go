@@ -535,7 +535,7 @@ func uiDevices(w http.ResponseWriter, r *http.Request) {
   </style>
 </head>
 <body>
-  <h1>XDP47 вЂ” Devices</h1>
+  <h1>XDP47 — Devices</h1>
   <div class="toolbar">
     <div class="chip muted">Auto-refresh: <span id="refint">5s</span></div>
     <div class="chip muted">Now: <span id="now"></span></div>
@@ -692,4 +692,5 @@ load(); setInterval(load, 5000);
     w.Header().Set("Content-Type", "text/html; charset=utf-8")
     _, _ = w.Write([]byte(html))
 }
+
 
